@@ -26,6 +26,7 @@
             node {
               firstName
               lastName
+              legacyId
               avgRating
               avgDifficulty
               numRatings
@@ -315,6 +316,12 @@
     return { text, color };
   }
 
+  function buildProfileUrl(prof) {
+    const legacyId = prof?.legacyId;
+    if (!legacyId) return "";
+    return `https://www.ratemyprofessors.com/professor/${legacyId}`;
+  }
+
   function injectRating(el, data) {
     if (!el) return;
     if (el.dataset.rmpInjected === "true") return;
@@ -332,6 +339,22 @@
     const { text, color } = formatRating(data);
     span.textContent = text;
     span.style.color = color;
+
+    const profileUrl = buildProfileUrl(data);
+    if (profileUrl) {
+      const link = document.createElement("a");
+      link.className = "rmp-link";
+      link.textContent = "RMP";
+      link.href = profileUrl;
+      link.target = "_blank";
+      link.rel = "noopener noreferrer";
+      link.style.marginLeft = "6px";
+      link.style.fontSize = "0.9em";
+      link.style.fontWeight = "600";
+      link.style.textDecoration = "underline";
+      link.style.color = "#1a73e8";
+      span.appendChild(link);
+    }
 
     el.dataset.rmpInjected = "true";
     el.appendChild(span);
