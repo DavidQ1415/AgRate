@@ -1,0 +1,18 @@
+{
+  "manifest_version": 3,
+  "name": "Schedule Builder RMP Ratings",
+  "version": "1.0.0",
+  "description": "Injects RateMyProfessors ratings into schedule builder pages.",
+  "permissions": ["storage", "activeTab"],
+  "host_permissions": ["https://www.ratemyprofessors.com/*"],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://tamu.collegescheduler.com/*"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}
