@@ -2,6 +2,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (!message || !message.type) return;
 
   if (message.type === "RMP_FETCH") {
+    // Proxy RMP GraphQL requests from the content script to avoid CORS issues.
     (async () => {
       try {
         const res = await fetch(message.endpoint, {
@@ -26,6 +27,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   }
 
   if (message.type === "ANEX_FETCH") {
+    // Proxy ANEX POST requests for GPA data (URL-encoded form payload).
     (async () => {
       try {
         const { dept, number } = message.payload || {};

@@ -17,6 +17,7 @@
     anexEndpoint: "https://anex.us/grades/getData/",
   };
 
+  // Bump this to invalidate local storage keys if cache format changes.
   const CACHE_VERSION = 3;
 
   const GRAPHQL_QUERY = `
@@ -40,12 +41,14 @@
     }
   `;
 
+  // In-flight request dedupe and a simple concurrency gate.
   const inFlight = new Map();
   const gpaInFlight = new Map();
   const queue = [];
   let activeCount = 0;
   let debounceTimer = null;
 
+  // Normalize instructor names to improve matching across data sources.
   const normalizeName = (name) => {
     if (!name || typeof name !== "string") return "";
     let n = name;
@@ -63,6 +66,7 @@
       .trim();
   };
 
+  // Extract first/last for match heuristics.
   const parseName = (name) => {
     const full = normalizeName(name);
     if (!full) return { first: "", last: "", full: "" };
@@ -80,6 +84,7 @@
 
   const toTitleCase = (s) => s.replace(/\b([a-z])/g, (m) => m.toUpperCase());
 
+  // RMP GraphQL request via background service worker.
   async function rmpFetch(queryText) {
     const response = await new Promise((resolve, reject) => {
       chrome.runtime.sendMessage(
@@ -111,6 +116,7 @@
     return edges.map((e) => e.node).filter(Boolean);
   }
 
+  // ANEX POST request via background service worker.
   async function anexFetch(dept, number) {
     const response = await new Promise((resolve, reject) => {
       chrome.runtime.sendMessage(
@@ -138,6 +144,7 @@
     return data?.classes || [];
   }
 
+  // Find instructor name fields on the schedule builder details panel.
   function getInstructorNameElements() {
     const items = Array.from(
       document.querySelectorAll(CONFIG.instructorRowSelector),
@@ -158,6 +165,7 @@
     return results;
   }
 
+  // Map normalized instructor names -> DOM elements + course info.
   function getProfessorNames() {
     const elements = getInstructorNameElements();
     const names = new Map();
@@ -178,6 +186,7 @@
     return `rmp:v${CACHE_VERSION}:${name.toLowerCase()}`;
   }
 
+  // Cache helpers (RMP search results).
   async function getCached(name) {
     const key = cacheKey(name);
     const data = await chrome.storage.local.get(key);
@@ -205,6 +214,7 @@
     });
   }
 
+  // Fetch RMP candidates with fallbacks and cache the results.
   async function fetchProfessorData(name) {
     const cached = await getCached(name);
     if (cached) return cached;
@@ -236,6 +246,7 @@
     }
   }
 
+  // Throttle remote requests to avoid bursts.
   function enqueueRequest(fn) {
     return new Promise((resolve, reject) => {
       queue.push({ fn, resolve, reject });
@@ -258,6 +269,7 @@
       });
   }
 
+  // Pick the best RMP candidate using name heuristics and rating count.
   const matchProfessor = (results, targetName) => {
     const edges = results?.edges || [];
     if (!Array.isArray(edges) || edges.length === 0) return null;
@@ -423,6 +435,7 @@
     return Number.isFinite(num) ? num : null;
   }
 
+  // Estimate section size for weighted GPA (falls back to grade counts).
   function classSizeValue(cls) {
     const direct =
       cls?.students ??
@@ -518,6 +531,7 @@
     return false;
   }
 
+  // Compute weighted GPA for the most recent term across all matching sections.
   function extractMostRecentGpa(classes, profName) {
     if (!Array.isArray(classes) || classes.length === 0) return null;
     const target = normalizeInstructorName(profName);
@@ -572,6 +586,7 @@
     };
   }
 
+  // Fetch and cache GPA data for a professor + course.
   async function fetchGpaForProfessorCourse(name, course) {
     if (!course?.dept || !course?.number) return null;
     const cached = await getCachedGpa(name, course.dept, course.number);
@@ -616,6 +631,7 @@
     )}&number=${encodeURIComponent(course.number)}`;
   }
 
+  // Inject the RMP rating badge next to the instructor name.
   function injectRating(el, data) {
     if (!el) return;
     if (el.dataset.rmpInjected === "true") return;
@@ -654,6 +670,7 @@
     el.appendChild(span);
   }
 
+  // Inject GPA info and link to ANEX.
   function injectGpa(el, gpaInfo, course) {
     if (!el) return;
     let span = el.querySelector(".rmp-gpa");
@@ -692,6 +709,7 @@
     link.href = url;
   }
 
+  // End-to-end flow for one instructor: match RMP, inject ratings, fetch GPA.
   async function handleProfessor(name, entries) {
     try {
       const candidates = await fetchProfessorData(name);
@@ -721,6 +739,7 @@
     }
   }
 
+  // Scan the page and inject data for all instructors found.
   function scanAndInject() {
     const map = getProfessorNames();
     for (const [name, entries] of map.entries()) {
@@ -728,6 +747,7 @@
     }
   }
 
+  // Try to infer course dept/number from nearby text for ANEX lookups.
   function findCourseForElement(el) {
     const maxDepth = 6;
     let node = el;
@@ -761,6 +781,7 @@
     debounceTimer = setTimeout(scanAndInject, CONFIG.debounceMs);
   }
 
+  // Re-scan when Schedule Builder dynamically updates the DOM.
   function observeDom() {
     const observer = new MutationObserver((mutations) => {
       for (const m of mutations) {
