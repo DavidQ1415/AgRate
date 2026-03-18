@@ -4,7 +4,10 @@
   "version": "1.0.0",
   "description": "Injects RateMyProfessors ratings into schedule builder pages.",
   "permissions": ["storage", "activeTab"],
-  "host_permissions": ["https://www.ratemyprofessors.com/*"],
+  "host_permissions": [
+    "https://www.ratemyprofessors.com/*",
+    "https://anex.us/*"
+  ],
   "background": {
     "service_worker": "background.js"
   },

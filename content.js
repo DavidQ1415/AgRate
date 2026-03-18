@@ -13,7 +13,8 @@
     emptyCacheTtlMs: 60 * 60 * 1000,
     debounceMs: 300,
     maxConcurrent: 4,
-    debug: false
+    debug: false,
+    anexEndpoint: "https://anex.us/grades/getData/"
   };
 
   const CACHE_VERSION = 3;
@@ -40,6 +41,7 @@
   `;
 
   const inFlight = new Map();
+  const gpaInFlight = new Map();
   const queue = [];
   let activeCount = 0;
   let debounceTimer = null;
@@ -112,6 +114,33 @@
     return edges.map((e) => e.node).filter(Boolean);
   }
 
+  async function anexFetch(dept, number) {
+    const response = await new Promise((resolve, reject) => {
+      chrome.runtime.sendMessage(
+        {
+          type: "ANEX_FETCH",
+          endpoint: CONFIG.anexEndpoint,
+          payload: { dept, number }
+        },
+        (res) => {
+          const err = chrome.runtime.lastError;
+          if (err) {
+            reject(new Error(err.message));
+            return;
+          }
+          resolve(res);
+        }
+      );
+    });
+
+    if (!response || !response.ok) {
+      throw new Error(response?.error || "ANEX fetch failed");
+    }
+
+    const data = response.data;
+    return data?.classes || [];
+  }
+
   function getInstructorNameElements() {
     const items = Array.from(
       document.querySelectorAll(CONFIG.instructorRowSelector)
@@ -140,7 +169,10 @@
       const clean = normalizeName(raw);
       if (!clean) continue;
       if (!names.has(clean)) names.set(clean, []);
-      names.get(clean).push(el);
+      names.get(clean).push({
+        el,
+        course: findCourseForElement(el)
+      });
     }
     return names;
   }
@@ -316,10 +348,219 @@
     return { text, color };
   }
 
+  function gpaCacheKey(name, dept, number) {
+    const n = normalizeName(name);
+    return `gpa:v${CACHE_VERSION}:${dept}:${number}:${n}`;
+  }
+
+  async function getCachedGpa(name, dept, number) {
+    const key = gpaCacheKey(name, dept, number);
+    const data = await chrome.storage.local.get(key);
+    const entry = data[key];
+    if (!entry) return null;
+    const age = Date.now() - entry.timestamp;
+    if (!entry.timestamp || age > CONFIG.cacheTtlMs) {
+      await chrome.storage.local.remove(key);
+      return null;
+    }
+    return entry.value ?? null;
+  }
+
+  async function setCachedGpa(name, dept, number, value) {
+    const key = gpaCacheKey(name, dept, number);
+    await chrome.storage.local.set({
+      [key]: { value, timestamp: Date.now() }
+    });
+  }
+
+  function normalizeInstructorName(name) {
+    return normalizeName(name);
+  }
+
+  function parseAnexInstructorName(name) {
+    const cleaned = normalizeInstructorName(name);
+    if (!cleaned) return { first: "", last: "", firstInitial: "" };
+    const parts = cleaned.split(" ").filter(Boolean);
+    if (parts.length === 2 && parts[1].length === 1) {
+      return {
+        first: "",
+        last: parts[0],
+        firstInitial: parts[1]
+      };
+    }
+    if (parts.length >= 2) {
+      const first = parts[0];
+      const last = parts[parts.length - 1];
+      return {
+        first,
+        last,
+        firstInitial: first ? first[0] : ""
+      };
+    }
+    return { first: "", last: parts[0] || "", firstInitial: "" };
+  }
+
+  function classInstructorName(cls) {
+    return (
+      cls?.instructor ||
+      cls?.professor ||
+      cls?.prof ||
+      cls?.instructor_name ||
+      cls?.instructorName ||
+      cls?.teacher ||
+      cls?.name ||
+      ""
+    );
+  }
+
+  function classGpaValue(cls) {
+    const raw =
+      cls?.gpa ??
+      cls?.avgGpa ??
+      cls?.averageGpa ??
+      cls?.gpaAverage ??
+      cls?.average_gpa ??
+      cls?.avg_gpa;
+    const num = Number(raw);
+    return Number.isFinite(num) ? num : null;
+  }
+
+  function classTermValue(cls) {
+    const year = cls?.year || "";
+    const semester = cls?.semester || "";
+    if (year && semester) return `${year} ${semester}`;
+    return (
+      cls?.term ||
+      cls?.semester ||
+      cls?.termName ||
+      cls?.term_code ||
+      cls?.termCode ||
+      cls?.year ||
+      ""
+    );
+  }
+
+  function termToSortValue(term) {
+    if (term == null) return -Infinity;
+    if (typeof term === "number" && Number.isFinite(term)) return term;
+    const str = String(term).trim();
+    if (!str) return -Infinity;
+    const yearMatch = str.match(/(19|20)\d{2}/);
+    if (!yearMatch) return -Infinity;
+    const year = Number(yearMatch[0]);
+    const lower = str.toLowerCase();
+    let season = 0;
+    if (lower.includes("spring")) season = 1;
+    else if (lower.includes("summer")) season = 2;
+    else if (lower.includes("fall")) season = 3;
+    else if (lower.includes("winter")) season = 0;
+    else {
+      const after = str.slice(str.indexOf(yearMatch[0]) + 4);
+      const digits = after.match(/\d+/);
+      if (digits) {
+        season = Number(digits[0]) || 0;
+      } else {
+        const letter = after.match(/[A-Z]/i);
+        if (letter) {
+          const c = letter[0].toUpperCase().charCodeAt(0) - 64;
+          season = c > 0 ? c : 0;
+        }
+      }
+    }
+    return year * 10 + season;
+  }
+
+  function matchesInstructor(targetName, instructorName) {
+    const target = parseName(targetName);
+    const cand = parseAnexInstructorName(instructorName);
+    if (!target.full) return false;
+    if (cand.last && target.last && cand.last === target.last) {
+      const targetInitial = target.first ? target.first[0] : "";
+      if (cand.firstInitial && targetInitial) {
+        return cand.firstInitial === targetInitial;
+      }
+      const f2 = target.first || "";
+      return f2.length > 0;
+    }
+    return false;
+  }
+
+  function extractMostRecentGpa(classes, profName) {
+    if (!Array.isArray(classes) || classes.length === 0) return null;
+    const target = normalizeInstructorName(profName);
+    const matches = classes
+      .map((cls) => {
+        const instructor = classInstructorName(cls);
+        const gpa = classGpaValue(cls);
+        const term = classTermValue(cls);
+        const sortValue = termToSortValue(term);
+        return {
+          cls,
+          instructor,
+          gpa,
+          term,
+          sortValue
+        };
+      })
+      .filter((item) => {
+        if (item.gpa == null) return false;
+        const name = normalizeInstructorName(item.instructor);
+        if (!name) return false;
+        return name === target || matchesInstructor(profName, item.instructor);
+      });
+
+    if (matches.length === 0) return null;
+
+    matches.sort((a, b) => b.sortValue - a.sortValue);
+    const best = matches[0];
+    return {
+      gpa: best.gpa,
+      term: best.term || ""
+    };
+  }
+
+  async function fetchGpaForProfessorCourse(name, course) {
+    if (!course?.dept || !course?.number) return null;
+    const cached = await getCachedGpa(name, course.dept, course.number);
+    if (cached) return cached;
+
+    const key = gpaCacheKey(name, course.dept, course.number);
+    if (gpaInFlight.has(key)) return gpaInFlight.get(key);
+
+    const promise = enqueueRequest(async () => {
+      const classes = await anexFetch(course.dept, course.number);
+      const gpaInfo = extractMostRecentGpa(classes, name);
+      await setCachedGpa(name, course.dept, course.number, gpaInfo);
+      return gpaInfo;
+    });
+
+    gpaInFlight.set(key, promise);
+    try {
+      return await promise;
+    } finally {
+      gpaInFlight.delete(key);
+    }
+  }
+
   function buildProfileUrl(prof) {
     const legacyId = prof?.legacyId;
     if (!legacyId) return "";
     return `https://www.ratemyprofessors.com/professor/${legacyId}`;
+  }
+
+  function formatGpa(gpaInfo) {
+    if (!gpaInfo || gpaInfo.gpa == null) return "";
+    const gpa = Number(gpaInfo.gpa);
+    if (!Number.isFinite(gpa)) return "";
+    const term = gpaInfo.term ? ` (${gpaInfo.term})` : "";
+    return `GPA: ${gpa.toFixed(2)}${term}`;
+  }
+
+  function buildAnexUrl(course) {
+    if (!course?.dept || !course?.number) return "";
+    return `https://anex.us/grades/?dept=${encodeURIComponent(
+      course.dept
+    )}&number=${encodeURIComponent(course.number)}`;
   }
 
   function injectRating(el, data) {
@@ -360,7 +601,45 @@
     el.appendChild(span);
   }
 
-  async function handleProfessor(name, elements) {
+  function injectGpa(el, gpaInfo, course) {
+    if (!el) return;
+    let span = el.querySelector(".rmp-gpa");
+    if (!span) {
+      span = document.createElement("span");
+      span.className = "rmp-gpa";
+      span.style.marginLeft = "6px";
+      span.style.fontSize = "0.9em";
+      span.style.fontWeight = "600";
+      span.style.color = "#444";
+      el.appendChild(span);
+    }
+    const text = formatGpa(gpaInfo);
+    if (!text) {
+      span.textContent = "";
+      return;
+    }
+    span.textContent = text;
+
+    const url = buildAnexUrl(course);
+    if (!url) return;
+    let link = span.querySelector(".rmp-gpa-link");
+    if (!link) {
+      link = document.createElement("a");
+      link.className = "rmp-gpa-link";
+      link.textContent = "ANEX";
+      link.target = "_blank";
+      link.rel = "noopener noreferrer";
+      link.style.marginLeft = "6px";
+      link.style.fontSize = "0.9em";
+      link.style.fontWeight = "600";
+      link.style.textDecoration = "underline";
+      link.style.color = "#1a73e8";
+      span.appendChild(link);
+    }
+    link.href = url;
+  }
+
+  async function handleProfessor(name, entries) {
     try {
       const candidates = await fetchProfessorData(name);
       if (CONFIG.debug) {
@@ -373,12 +652,16 @@
       if (CONFIG.debug) {
         console.debug("RMP match:", name, match);
       }
-      for (const el of elements) {
-        injectRating(el, match);
+      for (const entry of entries) {
+        injectRating(entry.el, match);
+        fetchGpaForProfessorCourse(name, entry.course)
+          .then((gpaInfo) => injectGpa(entry.el, gpaInfo, entry.course))
+          .catch(() => injectGpa(entry.el, null, entry.course));
       }
     } catch (err) {
-      for (const el of elements) {
-        injectRating(el, null);
+      for (const entry of entries) {
+        injectRating(entry.el, null);
+        injectGpa(entry.el, null, entry.course);
       }
       // Swallow errors to avoid breaking page
       console.warn("RMP fetch failed:", err);
@@ -387,9 +670,37 @@
 
   function scanAndInject() {
     const map = getProfessorNames();
-    for (const [name, elements] of map.entries()) {
-      handleProfessor(name, elements);
+    for (const [name, entries] of map.entries()) {
+      handleProfessor(name, entries);
     }
+  }
+
+  function findCourseForElement(el) {
+    const maxDepth = 6;
+    let node = el;
+    for (let i = 0; i < maxDepth && node; i += 1) {
+      const text = (node.textContent || "").toUpperCase();
+      const match = text.match(/\b([A-Z]{2,4})\s*-?\s*([0-9]{3}[A-Z]?)\b/);
+      if (match) {
+        return { dept: match[1], number: match[2] };
+      }
+      node = node.parentElement;
+    }
+
+    const tbody = el.closest("tbody");
+    if (!tbody) return null;
+    const rows = Array.from(tbody.querySelectorAll("tr"));
+    if (rows.length === 0) return null;
+    const rowIndex = rows.findIndex((r) => r.contains(el));
+    const startIndex = rowIndex > 0 ? rowIndex - 1 : rows.length - 1;
+    for (let i = startIndex; i >= 0; i -= 1) {
+      const rowText = (rows[i].textContent || "").toUpperCase();
+      const match = rowText.match(/\b([A-Z]{2,4})\s*-?\s*([0-9]{3}[A-Z]?)\b/);
+      if (match) {
+        return { dept: match[1], number: match[2] };
+      }
+    }
+    return null;
   }
 
   function debounceScan() {
