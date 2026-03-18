@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "AgRate: Schedule Builder Ratings",
   "version": "1.0.0",
-  "description": "Shows RateMyProfessors ratings and ANEX GPA data inside the Texas A&M Schedule Builder.",
+  "description": "Shows RateMyProfessors ratings and ANEX GPA data inside the Texas A&M Schedule Builder. Made by David Quiroz Sanchez.",
   "icons": {
     "16": "icon.png",
     "48": "icon.png",
