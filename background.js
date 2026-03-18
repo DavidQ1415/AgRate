@@ -7,7 +7,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         const res = await fetch(message.endpoint, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(message.payload)
+          body: JSON.stringify(message.payload),
         });
 
         if (!res.ok) {
@@ -30,14 +30,14 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       try {
         const { dept, number } = message.payload || {};
         const body = `dept=${encodeURIComponent(
-          dept || ""
+          dept || "",
         )}&number=${encodeURIComponent(number || "")}`;
         const res = await fetch(message.endpoint, {
           method: "POST",
           headers: {
-            "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8"
+            "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
           },
-          body
+          body,
         });
 
         if (!res.ok) {

@@ -14,7 +14,7 @@
     debounceMs: 300,
     maxConcurrent: 4,
     debug: false,
-    anexEndpoint: "https://anex.us/grades/getData/"
+    anexEndpoint: "https://anex.us/grades/getData/",
   };
 
   const CACHE_VERSION = 3;
@@ -78,8 +78,7 @@
     return `${first} ${last}`.trim();
   };
 
-  const toTitleCase = (s) =>
-    s.replace(/\b([a-z])/g, (m) => m.toUpperCase());
+  const toTitleCase = (s) => s.replace(/\b([a-z])/g, (m) => m.toUpperCase());
 
   async function rmpFetch(queryText) {
     const response = await new Promise((resolve, reject) => {
@@ -89,8 +88,8 @@
           endpoint: CONFIG.graphqlEndpoint,
           payload: {
             query: GRAPHQL_QUERY,
-            variables: { text: queryText, schoolID: CONFIG.schoolId }
-          }
+            variables: { text: queryText, schoolID: CONFIG.schoolId },
+          },
         },
         (res) => {
           const err = chrome.runtime.lastError;
@@ -99,7 +98,7 @@
             return;
           }
           resolve(res);
-        }
+        },
       );
     });
 
@@ -108,9 +107,7 @@
     }
 
     const json = response.data;
-    const edges =
-      json?.data?.newSearch?.teachers?.edges ||
-      [];
+    const edges = json?.data?.newSearch?.teachers?.edges || [];
     return edges.map((e) => e.node).filter(Boolean);
   }
 
@@ -120,7 +117,7 @@
         {
           type: "ANEX_FETCH",
           endpoint: CONFIG.anexEndpoint,
-          payload: { dept, number }
+          payload: { dept, number },
         },
         (res) => {
           const err = chrome.runtime.lastError;
@@ -129,7 +126,7 @@
             return;
           }
           resolve(res);
-        }
+        },
       );
     });
 
@@ -143,7 +140,7 @@
 
   function getInstructorNameElements() {
     const items = Array.from(
-      document.querySelectorAll(CONFIG.instructorRowSelector)
+      document.querySelectorAll(CONFIG.instructorRowSelector),
     );
     const results = [];
     for (const li of items) {
@@ -171,7 +168,7 @@
       if (!names.has(clean)) names.set(clean, []);
       names.get(clean).push({
         el,
-        course: findCourseForElement(el)
+        course: findCourseForElement(el),
       });
     }
     return names;
@@ -204,7 +201,7 @@
   async function setCached(name, value) {
     const key = cacheKey(name);
     await chrome.storage.local.set({
-      [key]: { value, timestamp: Date.now() }
+      [key]: { value, timestamp: Date.now() },
     });
   }
 
@@ -251,7 +248,8 @@
     const item = queue.shift();
     if (!item) return;
     activeCount += 1;
-    item.fn()
+    item
+      .fn()
       .then((result) => item.resolve(result))
       .catch((err) => item.reject(err))
       .finally(() => {
@@ -272,15 +270,15 @@
       .map((node) => ({
         node,
         parsed: parseName(
-          `${node.firstName || ""} ${node.lastName || ""}`.trim()
-        )
+          `${node.firstName || ""} ${node.lastName || ""}`.trim(),
+        ),
       }));
 
     if (candidates.length === 0) return null;
 
     // Step 1: Exact full match
     const fullMatches = candidates.filter(
-      (c) => c.parsed.full && c.parsed.full === target.full
+      (c) => c.parsed.full && c.parsed.full === target.full,
     );
     if (fullMatches.length > 0) {
       return fullMatches.reduce((best, cur) => {
@@ -296,7 +294,7 @@
         c.parsed.first &&
         c.parsed.last &&
         c.parsed.first === target.first &&
-        c.parsed.last === target.last
+        c.parsed.last === target.last,
     );
     if (firstLastMatches.length > 0) {
       return firstLastMatches.reduce((best, cur) => {
@@ -343,7 +341,7 @@
     else if (rating >= 3) color = "#f0ad4e";
 
     const text = `⭐ ${rating.toFixed(1)} | Diff: ${difficulty.toFixed(
-      1
+      1,
     )} | ${numRatings} ratings`;
     return { text, color };
   }
@@ -369,7 +367,7 @@
   async function setCachedGpa(name, dept, number, value) {
     const key = gpaCacheKey(name, dept, number);
     await chrome.storage.local.set({
-      [key]: { value, timestamp: Date.now() }
+      [key]: { value, timestamp: Date.now() },
     });
   }
 
@@ -385,7 +383,7 @@
       return {
         first: "",
         last: parts[0],
-        firstInitial: parts[1]
+        firstInitial: parts[1],
       };
     }
     if (parts.length >= 2) {
@@ -394,7 +392,7 @@
       return {
         first,
         last,
-        firstInitial: first ? first[0] : ""
+        firstInitial: first ? first[0] : "",
       };
     }
     return { first: "", last: parts[0] || "", firstInitial: "" };
@@ -423,6 +421,41 @@
       cls?.avg_gpa;
     const num = Number(raw);
     return Number.isFinite(num) ? num : null;
+  }
+
+  function classSizeValue(cls) {
+    const direct =
+      cls?.students ??
+      cls?.numStudents ??
+      cls?.enrollment ??
+      cls?.enrolled ??
+      cls?.totalStudents ??
+      cls?.total ??
+      cls?.size ??
+      cls?.count;
+    const directNum = Number(direct);
+    if (Number.isFinite(directNum) && directNum > 0) return directNum;
+
+    const gradeKeyRegex = /^(a|b|c|d|f|q|i|s|u|w)(\+|_plus|_minus|-)?$/i;
+    const gradeKeyRegex2 = /^(a|b|c|d|f)(plus|minus)$/i;
+    const gradeKeyRegex3 = /^(grade|count)?[a-f]$/i;
+    let sum = 0;
+    let found = false;
+    for (const [key, value] of Object.entries(cls || {})) {
+      if (
+        gradeKeyRegex.test(key) ||
+        gradeKeyRegex2.test(key) ||
+        gradeKeyRegex3.test(key)
+      ) {
+        const num = Number(value);
+        if (Number.isFinite(num)) {
+          sum += num;
+          found = true;
+        }
+      }
+    }
+    if (found && sum > 0) return sum;
+    return null;
   }
 
   function classTermValue(cls) {
@@ -492,14 +525,16 @@
       .map((cls) => {
         const instructor = classInstructorName(cls);
         const gpa = classGpaValue(cls);
+        const size = classSizeValue(cls);
         const term = classTermValue(cls);
         const sortValue = termToSortValue(term);
         return {
           cls,
           instructor,
           gpa,
+          size,
           term,
-          sortValue
+          sortValue,
         };
       })
       .filter((item) => {
@@ -511,11 +546,29 @@
 
     if (matches.length === 0) return null;
 
-    matches.sort((a, b) => b.sortValue - a.sortValue);
-    const best = matches[0];
+    const byTerm = new Map();
+    for (const item of matches) {
+      const key = item.term || "";
+      const entry = byTerm.get(key) || {
+        term: key,
+        sortValue: item.sortValue,
+        totalPoints: 0,
+        totalStudents: 0,
+      };
+      const size = Number.isFinite(item.size) && item.size > 0 ? item.size : 1;
+      entry.totalPoints += Number(item.gpa) * size;
+      entry.totalStudents += size;
+      entry.sortValue = Math.max(entry.sortValue, item.sortValue);
+      byTerm.set(key, entry);
+    }
+
+    const terms = Array.from(byTerm.values());
+    terms.sort((a, b) => b.sortValue - a.sortValue);
+    const best = terms[0];
+    if (!best || best.totalStudents <= 0) return null;
     return {
-      gpa: best.gpa,
-      term: best.term || ""
+      gpa: best.totalPoints / best.totalStudents,
+      term: best.term || "",
     };
   }
 
@@ -559,7 +612,7 @@
   function buildAnexUrl(course) {
     if (!course?.dept || !course?.number) return "";
     return `https://anex.us/grades/?dept=${encodeURIComponent(
-      course.dept
+      course.dept,
     )}&number=${encodeURIComponent(course.number)}`;
   }
 
@@ -647,7 +700,7 @@
       }
       const match = matchProfessor(
         { edges: candidates.map((node) => ({ node })) },
-        name
+        name,
       );
       if (CONFIG.debug) {
         console.debug("RMP match:", name, match);
