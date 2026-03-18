@@ -1,8 +1,13 @@
 {
   "manifest_version": 3,
-  "name": "Schedule Builder RMP Ratings",
+  "name": "AgRate: Schedule Builder Ratings",
   "version": "1.0.0",
-  "description": "Injects RateMyProfessors ratings into schedule builder pages.",
+  "description": "Shows RateMyProfessors ratings and ANEX GPA data inside the Texas A&M Schedule Builder.",
+  "icons": {
+    "16": "icon.png",
+    "48": "icon.png",
+    "128": "icon.png"
+  },
   "permissions": ["storage", "activeTab"],
   "host_permissions": [
     "https://www.ratemyprofessors.com/*",
