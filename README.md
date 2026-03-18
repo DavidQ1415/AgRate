@@ -24,7 +24,7 @@ I am currently getting permissions to publish this on the Chrome Web Store to ma
 2. Unzip the download.
 3. Open `chrome://extensions/` in Chrome.
 4. Enable `Developer mode` (on the top right).
-5. Click `Load unpacked` and select the unzipped `AgRate` folder (not the ZIP file).
+5. Click `Load unpacked` and select the **inner** `AgRate` folder (the one that contains `manifest.json`). If the unzip gives you `AgRate/AgRate`, choose the second `AgRate`.
 6. Open the Texas A&M Schedule Builder and search for classes.
 
 **Data Sources**
