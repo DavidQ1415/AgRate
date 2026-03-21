@@ -26,7 +26,7 @@ I am currently getting this approved for the Chrome Web Store, so the steps belo
 
 Install walkthrough (auto-playing GIF):
 
-<img src="install.gif" alt="AgRate install walkthrough" width="700">
+<img src="install.gif" alt="AgRate install walkthrough" width="750">
 
 1. Download the latest ZIP from:
    https://github.com/DavidQ1415/AgRate/releases/download/v1.0.0-beta/AgRate.zip
