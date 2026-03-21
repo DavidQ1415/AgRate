@@ -4,7 +4,7 @@ AgRate is a Chrome extension that injects professor ratings and GPA data directl
 
 Here is a sample of what the extension looks like:
 
-![AgRate sample](image-1280x800.jpg)
+<img src="image-1280x800.jpg" alt="AgRate sample" width="750">
 
 I am currently getting this approved for the Chrome Web Store, so the steps below are the temporary install method. I will update this GitHub repo when the store listing is available.
 
@@ -23,6 +23,10 @@ I am currently getting this approved for the Chrome Web Store, so the steps belo
 4. Injects the results into the page UI.
 
 **Install (Developer Mode)**
+
+Install walkthrough (auto-playing GIF):
+
+<img src="install.gif" alt="AgRate install walkthrough" width="700">
 
 1. Download the latest ZIP from:
    https://github.com/DavidQ1415/AgRate/releases/download/v1.0.0-beta/AgRate.zip
