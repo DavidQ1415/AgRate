@@ -2,6 +2,10 @@
 
 AgRate is a Chrome extension that injects professor ratings and GPA data directly into the Texas A&M Schedule Builder, so you can compare sections without leaving the page. It pulls RateMyProfessors ratings and ANEX grade distribution data, then displays them inline next to the instructor name.
 
+Here is a sample of what the extension looks like:
+
+![AgRate sample](image-1280x800.jpg)
+
 I am currently getting this approved for the Chrome Web Store, so the steps below are the temporary install method. I will update this GitHub repo when the store listing is available.
 
 **Features**
