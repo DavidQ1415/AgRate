@@ -25,11 +25,7 @@ I am currently getting this approved for the Chrome Web Store, so the steps belo
 **Install (Developer Mode)**
 
 1. Download the latest ZIP from:
-
-```text
-https://github.com/DavidQ1415/AgRate/releases/download/v1.0.0-beta/AgRate.zip
-```
-
+   https://github.com/DavidQ1415/AgRate/releases/download/v1.0.0-beta/AgRate.zip
 2. Unzip the download.
 3. Open `chrome://extensions/` in Chrome.
 4. Enable `Developer mode` (on the top right).
