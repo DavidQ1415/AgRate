@@ -24,9 +24,11 @@ I am currently getting this approved for the Chrome Web Store, so the steps belo
 
 **Install (Developer Mode)**
 
-Install walkthrough (auto-playing GIF):
+Install walkthrough (auto-playing GIF). Click the GIF to open the full video:
 
-<img src="install.gif" alt="AgRate install walkthrough" width="700">
+<a href="samplevid.mp4">
+  <img src="install.gif" alt="AgRate install walkthrough" width="700">
+</a>
 
 1. Download the latest ZIP from:
    https://github.com/DavidQ1415/AgRate/releases/download/v1.0.0-beta/AgRate.zip
