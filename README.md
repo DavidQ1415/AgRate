@@ -26,7 +26,7 @@ I am currently getting this approved for the Chrome Web Store, so the steps belo
 
 Install walkthrough (auto-playing GIF). Click the GIF to open the full video:
 
-<a href="https://www.loom.com/share/168d6eda65f047d09754f8487c533310">
+<a href="https://www.loom.com/share/168d6eda65f047d09754f8487c533310" target="_blank" rel="noopener noreferrer">
   <img src="install.gif" alt="AgRate install walkthrough" width="700">
 </a>
 
