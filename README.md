@@ -6,7 +6,8 @@ Here is a sample of what the extension looks like:
 
 <img src="image-1280x800.jpg" alt="AgRate sample" width="750">
 
-I am currently getting this approved for the Chrome Web Store, so the steps below are the temporary install method. I will update this GitHub repo when the store listing is available.
+Chrome Web Store listing:
+https://chromewebstore.google.com/detail/bckpmobgaebkjnfpmbfocaliamlofcce?utm_source=item-share-cb
 
 **Features**
 
@@ -22,7 +23,13 @@ I am currently getting this approved for the Chrome Web Store, so the steps belo
 3. Queries ANEX for course GPA data by department and course number.
 4. Injects the results into the page UI.
 
-**Install (Developer Mode)**
+**Install (Chrome Web Store) — Recommended**
+
+1. Open the Chrome Web Store listing:
+   https://chromewebstore.google.com/detail/bckpmobgaebkjnfpmbfocaliamlofcce?utm_source=item-share-cb
+2. Click `Add to Chrome`.
+
+**Install (Developer Mode) — Not Recommended**
 
 Install walkthrough (auto-playing GIF). Click the GIF to open the full video:
 
