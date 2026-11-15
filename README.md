@@ -54,6 +54,11 @@ Install walkthrough (auto-playing GIF). Click the GIF to open the full video:
 
 1. The stats shown are for College Station, not Galveston.
 2. Data can occasionally be incorrect or mismatched. Always click the RMP and ANEX links to verify the source data.
+3. RMP profiles must have a plausible name match. Course subjects found in up to 100 RMP reviews help distinguish profiles with the same name. A **⚠ Verify RMP match** notice appears for approximate or ambiguous names, missing course information, or a subject not found in those reviews. Hover over the notice for the reason and click RMP to check the profile. Missing review evidence does not mean an instructor has never taught the subject.
+
+**Development**
+
+Run the matching regression tests with Node.js: `node --test tests/matching.test.cjs`.
 
 **Privacy**
 AgRate only runs on the Schedule Builder site and sends requests to RateMyProfessors and ANEX to fetch data. It does not collect or store personal user data.
