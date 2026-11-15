@@ -18,7 +18,7 @@
   };
 
   // Bump this to invalidate local storage keys if cache format changes.
-  const CACHE_VERSION = 3;
+  const CACHE_VERSION = 4;
 
   const GRAPHQL_QUERY = `
     query ($text: String!, $schoolID: ID!) {
@@ -34,6 +34,13 @@
               numRatings
               wouldTakeAgainPercent
               department
+              ratings(first: 100) {
+                edges {
+                  node {
+                    class
+                  }
+                }
+              }
             }
           }
         }
@@ -112,6 +119,9 @@
     }
 
     const json = response.data;
+    if (json?.errors?.length) {
+      throw new Error("RMP GraphQL request failed");
+    }
     const edges = json?.data?.newSearch?.teachers?.edges || [];
     return edges.map((e) => e.node).filter(Boolean);
   }
@@ -269,8 +279,19 @@
       });
   }
 
-  // Pick the best RMP candidate using name heuristics and rating count.
-  const matchProfessor = (results, targetName) => {
+  // Review course labels provide evidence, not a complete teaching history.
+  function hasCourseSubject(professor, course) {
+    const subject = course?.dept?.trim().toUpperCase();
+    if (!subject) return false;
+    return (professor?.ratings?.edges || []).some((edge) => {
+      const label = String(edge?.node?.class || "").trim().toUpperCase();
+      const prefix = label.match(/^([A-Z]+)(?:[^A-Z]|$)/);
+      return prefix?.[1] === subject;
+    });
+  }
+
+  // Require a plausible name before considering course evidence or popularity.
+  const matchProfessor = (results, targetName, course) => {
     const edges = results?.edges || [];
     if (!Array.isArray(edges) || edges.length === 0) return null;
 
@@ -288,17 +309,28 @@
 
     if (candidates.length === 0) return null;
 
+    const selectCandidate = (matches, nameWarning = "") => {
+      const subjectMatches = matches.filter((c) => hasCourseSubject(c.node, course));
+      const pool = subjectMatches.length ? subjectMatches : matches;
+      const best = pool.reduce((best, cur) =>
+        Number(cur.node?.numRatings || 0) > Number(best.node?.numRatings || 0) ? cur : best,
+      ).node;
+      const warnings = [nameWarning];
+      if (pool.length > 1) warnings.push("Multiple RMP profiles match this name.");
+      if (!subjectMatches.length) {
+        warnings.push(course?.dept
+          ? `No ${course.dept} course was found in the sampled RMP reviews (up to 100).`
+          : "The course subject could not be determined.");
+      }
+      return { ...best, matchWarning: warnings.filter(Boolean).join(" ") };
+    };
+
     // Step 1: Exact full match
     const fullMatches = candidates.filter(
       (c) => c.parsed.full && c.parsed.full === target.full,
     );
     if (fullMatches.length > 0) {
-      const best = fullMatches.reduce((best, cur) => {
-        const bestRatings = Number(best.node?.numRatings || 0);
-        const curRatings = Number(cur.node?.numRatings || 0);
-        return curRatings > bestRatings ? cur : best;
-      }).node;
-      return { ...best, matchWarning: fullMatches.length > 1 ? "Multiple RMP profiles match this name." : "" };
+      return selectCandidate(fullMatches);
     }
 
     // Step 2: Exact first + last match
@@ -310,12 +342,7 @@
         c.parsed.last === target.last,
     );
     if (firstLastMatches.length > 0) {
-      const best = firstLastMatches.reduce((best, cur) => {
-        const bestRatings = Number(best.node?.numRatings || 0);
-        const curRatings = Number(cur.node?.numRatings || 0);
-        return curRatings > bestRatings ? cur : best;
-      }).node;
-      return { ...best, matchWarning: "The full instructor name differs from this RMP profile." };
+      return selectCandidate(firstLastMatches, "The full instructor name differs from this RMP profile.");
     }
 
     // Step 3: Variation match (same last, first startsWith)
@@ -328,12 +355,7 @@
     });
 
     if (variations.length > 0) {
-      const best = variations.reduce((best, cur) => {
-        const bestRatings = Number(best.node?.numRatings || 0);
-        const curRatings = Number(cur.node?.numRatings || 0);
-        return curRatings > bestRatings ? cur : best;
-      }).node;
-      return { ...best, matchWarning: "Only an approximate instructor name matches this RMP profile." };
+      return selectCandidate(variations, "Only an approximate instructor name matches this RMP profile.");
     }
 
     // An unrelated popular profile is not evidence of an instructor match.
@@ -724,14 +746,14 @@
       if (CONFIG.debug) {
         console.debug("RMP candidates:", name, candidates);
       }
-      const match = matchProfessor(
-        { edges: candidates.map((node) => ({ node })) },
-        name,
-      );
-      if (CONFIG.debug) {
-        console.debug("RMP match:", name, match);
-      }
       for (const entry of entries) {
+        // The same instructor name may appear under different course subjects.
+        const match = matchProfessor(
+          { edges: candidates.map((node) => ({ node })) },
+          name,
+          entry.course,
+        );
+        if (CONFIG.debug) console.debug("RMP match:", name, entry.course, match);
         injectRating(entry.el, match);
         fetchGpaForProfessorCourse(name, entry.course)
           .then((gpaInfo) => injectGpa(entry.el, gpaInfo, entry.course))
