@@ -293,11 +293,12 @@
       (c) => c.parsed.full && c.parsed.full === target.full,
     );
     if (fullMatches.length > 0) {
-      return fullMatches.reduce((best, cur) => {
+      const best = fullMatches.reduce((best, cur) => {
         const bestRatings = Number(best.node?.numRatings || 0);
         const curRatings = Number(cur.node?.numRatings || 0);
         return curRatings > bestRatings ? cur : best;
       }).node;
+      return { ...best, matchWarning: fullMatches.length > 1 ? "Multiple RMP profiles match this name." : "" };
     }
 
     // Step 2: Exact first + last match
@@ -309,11 +310,12 @@
         c.parsed.last === target.last,
     );
     if (firstLastMatches.length > 0) {
-      return firstLastMatches.reduce((best, cur) => {
+      const best = firstLastMatches.reduce((best, cur) => {
         const bestRatings = Number(best.node?.numRatings || 0);
         const curRatings = Number(cur.node?.numRatings || 0);
         return curRatings > bestRatings ? cur : best;
       }).node;
+      return { ...best, matchWarning: "The full instructor name differs from this RMP profile." };
     }
 
     // Step 3: Variation match (same last, first startsWith)
@@ -322,23 +324,20 @@
       if (c.parsed.last !== target.last) return false;
       const f1 = c.parsed.first || "";
       const f2 = target.first || "";
-      return f1.startsWith(f2) || f2.startsWith(f1);
+      return Boolean(f1 && f2) && (f1.startsWith(f2) || f2.startsWith(f1));
     });
 
     if (variations.length > 0) {
-      return variations.reduce((best, cur) => {
+      const best = variations.reduce((best, cur) => {
         const bestRatings = Number(best.node?.numRatings || 0);
         const curRatings = Number(cur.node?.numRatings || 0);
         return curRatings > bestRatings ? cur : best;
       }).node;
+      return { ...best, matchWarning: "Only an approximate instructor name matches this RMP profile." };
     }
 
-    // Step 4: Final fallback — highest numRatings overall
-    return candidates.reduce((best, cur) => {
-      const bestRatings = Number(best.node?.numRatings || 0);
-      const curRatings = Number(cur.node?.numRatings || 0);
-      return curRatings > bestRatings ? cur : best;
-    }).node;
+    // An unrelated popular profile is not evidence of an instructor match.
+    return null;
   };
 
   function formatRating(prof) {
@@ -664,6 +663,15 @@
       link.style.textDecoration = "underline";
       link.style.color = "#1a73e8";
       span.appendChild(link);
+    }
+
+    if (data?.matchWarning) {
+      const warning = document.createElement("span");
+      warning.className = "rmp-match-warning";
+      warning.textContent = " ⚠ Verify RMP match";
+      warning.title = `${data.matchWarning} Click RMP to verify the instructor.`;
+      warning.style.color = "#8a5700";
+      span.appendChild(warning);
     }
 
     el.dataset.rmpInjected = "true";
